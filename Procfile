@@ -1,1 +1,1 @@
-web: streamlit run coronavirus.py port=$PORT serverPort=$PORT 
+web: sh setup.sh && streamlit run coronavirus.py 
