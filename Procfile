@@ -1,0 +1,1 @@
+web: streamlit run coronavirus.py port=$PORT serverPort=$PORT 
