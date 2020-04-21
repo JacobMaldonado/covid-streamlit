@@ -1,11 +1,14 @@
-import requests
-import streamlit as st
+# Librerias
+import requests # Para hacer la petición a la api
+import streamlit as st # Libreria para hacer el dashboard
 import numpy as np
 import pandas as pd
+# Librerias para graficación
 import pydeck as pdk
 import plotly.graph_objects as go
 import plotly.express as px
 import altair as alt
+# Libreria para calcular el error de la predicción
 from sklearn.metrics import r2_score, mean_squared_error
 
 
@@ -15,31 +18,29 @@ GREATER_EQUAL = 0
 
 @st.cache
 def getAndCleanData():
+    # Se definen las columnas de importancia
     cols = ['Country_Region', 'Lat', 'Long', 'Province_State']
     classifier = ['Confirmed', 'Deaths', 'Recovered']
+    # Obtenemos los datos
     r = requests.get("http://64.227.56.58:5000/covid19").json()
     tabla = pd.DataFrame(r)
-    tabla = tabla.groupby(cols)
+    agrupacion = tabla.groupby(cols)
     frames = []
-    for name, group in tabla:
+    for name, group in agrupacion:
         df = group.pivot(index='Classifier', columns='Date', values='Value')
         newCols = []
-        # Cambiamos fechas con guion bajo para usarlas en pydeck
-        # for column in list(df.columns.values):
-        #     newCols.append(
-        #         'D' + str(column).replace('-', '_').replace(':', '_'))
-        #df.columns = newCols
-        # Rellenamos datos faltantes como fila de clasificador y cambiar NaN por 0
         df.fillna(0, inplace=True)
         for c in classifier:
             # si no se encuentra el clasificador
             if not c in list(df.index.values):
+                # llena todo el renglon con ceros
                 df.loc[c] = 0
         # Calculamos los casos existentes actualmente
-        existing = pd.Series([int(df.iloc[0, i]) - int(df.iloc[2, i]) - int(df.iloc[1, i])
+        existing = pd.Series([int(df.iloc[0, i]) - (int(df.iloc[2, i]) + int(df.iloc[1, i]))
                               for i in range(df.shape[1])]).rename('Existing')
         existing.index = list(df.columns.values)
         df = df.append(existing)
+        # Se agregan las columnas Pais_region, Lat, Long, Provincia_estado
         for i in range(len(name)):
             df.insert(i, cols[i], name[i])
         frames.append(df)
@@ -86,9 +87,10 @@ def similarChart(compareDf, dataframe, condition=GREATER_EQUAL):
 
 
 def tabGeneralAnalisis(resultado, r):
+    # Obtenemos los casos confirmados de la fecha mas reciente
     forMap = resultado.loc['Confirmed', :]
     lastDate = str(list(forMap.columns.values)[-5])
-    # ----------------- APP MAIN ----------------------
+    forMap = resultado.loc[lambda x: x[lastDate] > 0, :]
     st.write("### Mapa en función de los casos confirmados")
     st.plotly_chart(px.scatter_geo(forMap, lat="Lat", lon="Long", text="Country_Region",
                                    hover_name="Country_Region", hover_data=["Country_Region", "Province_State", lastDate], size=lastDate,
@@ -159,6 +161,7 @@ def forecastByCountry(country, minElev, maxElev, inter = 20):
     return pd.DataFrame(bestModel, columns=['Best Forecast'])
 
 
+# Script principal
 resultado, r = getAndCleanData()
 opcion = st.sidebar.selectbox(
     'Escala de Visualización', ['Global', 'Por País'])
